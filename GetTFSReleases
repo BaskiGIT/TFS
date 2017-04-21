@@ -1,0 +1,53 @@
+## CHANGE THE VALUES FOR BELOW VARIABLES TO MATCH YOUR TFS INSTANCE AND TFS USER ACCOUNT ##
+
+$TFSURL = "TFSURL"
+
+$CollectionName = "Default"
+
+$User = "Domain\USERName"
+
+## FILL THE ABOVE BEFORE PROCEEDING FURTHER ##
+
+$securePassword = Get-Content "F:\temp\Password_Feb2017.txt" | ConvertTo-SecureString
+
+$credential = New-Object System.Management.Automation.PSCredential($User, $securePassword)
+
+$base64AuthInfo = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes(("{0}:{1}" -f $username,$credential)))
+
+function Get-Projects
+{
+    $projects_API = "https://$TFSURL/$CollectionName/_apis/projects?api-version=1.0&`$top=200"
+    Invoke-RestMethod -Method Get -Uri $projects_API -Credential $credential -Headers @{Authorization=("Basic {0}" -f $base64AuthInfo)} -ContentType application/json
+}
+
+$projects = Get-Projects
+
+$count = 0
+
+Write-Host "`r`r Number of team projects is " $($projects.count)
+
+function Get-Releases
+{
+    Write-Host "The URL used is " $release
+    $releaseId = Invoke-RestMethod -Method Get -Uri $release -Credential $credential -Headers @{Authorization=("Basic {0}" -f $base64AuthInfo)} -ContentType application/json
+    return $releaseId.value[0].id
+}
+
+for ($i = 0; $i -lt $projects.count; $i++)
+{
+    
+    $projectId = $projects.value[$i].id
+
+    $projectName = $projects.value[$i].name
+
+    $release = "https://$TFSURL/$CollectionName/$projectId/_apis/release/releases?api-version=3.0-preview.2&`$top=1&queryOrder=descending"
+
+    $releaseid = Get-Releases
+
+    $count += $releaseid
+
+    Write-Host "The latest release id for the project $projectName is $releaseid"
+
+}
+
+Write-Host "Total releases done is : $count"
