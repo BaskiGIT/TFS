@@ -1,0 +1,85 @@
+using Newtonsoft.Json.Linq;
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
+using System.Linq;
+using System.Net.Http;
+using System.Net.Http.Headers;
+using System.Text;
+using System.Threading.Tasks;
+using System.Xml.Linq;
+
+namespace UploadReleaseDefinition
+{
+    class Program
+    {
+        static void Main(string[] args)
+        {
+            GetReleaseDefinitions();
+        }
+
+        public static async void GetReleaseDefinitions()
+        {
+            
+
+            var personalaccesstoken = "myToken";
+
+
+            using (HttpClient client = new HttpClient())
+            {
+                string filename = String.Format("{0:yyyy-MM-dd}__{1}__{2}__{3}__{4}", DateTime.Now, DateTime.Now.TimeOfDay.Hours, DateTime.Now.TimeOfDay.Minutes, DateTime.Now.TimeOfDay.Seconds, "output.json");
+                string path = Path.Combine("F:\\SourceFiles\\Output", filename);
+
+                client.DefaultRequestHeaders.Accept.Add(
+                    new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/json"));
+
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic",
+                    Convert.ToBase64String(
+                        System.Text.ASCIIEncoding.ASCII.GetBytes(
+                            string.Format("{0}:{1}", "", personalaccesstoken))));
+
+                using (HttpResponseMessage response = client.GetAsync(
+                            "https://TFS_CollectionURI/ProjectName/_apis/release/definitions/ReleaseDefinitionID?api-version=3.0-preview.2").Result)
+                {
+                    response.EnsureSuccessStatusCode();
+                    string responseBody = await response.Content.ReadAsStringAsync();
+                    //Console.WriteLine(responseBody);
+
+
+
+                    using (System.IO.StreamWriter file = new System.IO.StreamWriter(path, true))
+                    {
+                        file.WriteLine(responseBody);
+                    }
+
+                    Console.WriteLine("Definition is fetched from TFS. Make changes in the file {0} and then press enter.", path);
+                    
+                    Console.ReadLine();
+
+                    //Changes to the file are done at this point manually                    
+
+                }
+
+                using (StreamReader r = new StreamReader(path))
+                {
+                    string json = r.ReadToEnd();
+
+
+                    dynamic definitionJsonObject = JObject.Parse(json);
+
+
+                    // updating name of the release definition object
+                    definitionJsonObject.name = "ISP_Release";
+                    var updatedDefinitionObject = new StringContent(definitionJsonObject.ToString(), Encoding.UTF8, "application/json");
+                    Console.WriteLine("About to update the release definition Are you sure? Then press enter");
+                    Console.ReadLine();
+                    using (HttpResponseMessage response = client.PutAsync("https://TFS_CollectionURI/ProjectName/_apis/release/definitions/?api-version=3.0-preview.2", updatedDefinitionObject).Result)
+                    {
+                        response.EnsureSuccessStatusCode();
+                    }
+                }
+            }
+        }
+    }
+}
